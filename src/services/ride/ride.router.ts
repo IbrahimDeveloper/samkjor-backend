@@ -1,6 +1,7 @@
 import { Router, Request, Response, NextFunction } from "express";
 import { z } from "zod";
 import { requireAuth, requireDriver } from "../../middleware/auth";
+import { queryOne } from "../../db";
 import {
   postRide,
   getRide,
@@ -61,6 +62,25 @@ router.post("/", requireAuth, async (req: Request, res: Response, next: NextFunc
   } catch (err) {
     next(err);
   }
+});
+
+// GET /rides/my-active  — driver's current live ride
+router.get("/my-active", requireAuth, requireDriver, async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const ride = await queryOne<Record<string, unknown>>(
+      `SELECT r.*,
+              ST_AsGeoJSON(r.route_polyline)::json AS route_polyline_geo,
+              ST_Y(r.origin_coords::geometry) AS origin_lat,
+              ST_X(r.origin_coords::geometry) AS origin_lng,
+              ST_Y(r.destination_coords::geometry) AS dest_lat,
+              ST_X(r.destination_coords::geometry) AS dest_lng
+       FROM rides r
+       WHERE r.initiator_id = $1 AND r.status IN ('live','scheduled')
+       ORDER BY r.created_at DESC LIMIT 1`,
+      [req.user!.user_id]
+    );
+    res.json(ride ?? null);
+  } catch (err) { next(err); }
 });
 
 // GET /rides/nearby?lat=&lng=&radius=
