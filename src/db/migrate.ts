@@ -16,7 +16,7 @@ async function migrate() {
     ? migrationsDir
     : path.join(__dirname, "migrations");
 
-  const files = ["001_init.sql", "002_claim_and_address.sql"];
+  const files = ["001_init.sql", "002_claim_and_address.sql", "003_add_email.sql"];
   const sql = files
     .map((f) => fs.readFileSync(path.join(dir, f), "utf8"))
     .join("\n");

@@ -26,6 +26,7 @@
     "dotenv": "^16.4.5",
     "uuid": "^10.0.0",
     "axios": "^1.7.2",
+    "resend": "^3.2.0",
     "@types/express": "^4.17.21",
     "@types/pg": "^8.11.6",
     "@types/jsonwebtoken": "^9.0.6",

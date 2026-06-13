@@ -2,6 +2,7 @@ import { query, queryOne } from "../../db";
 import { redis, keys } from "../../redis";
 import { computeBaseFare } from "../fare/fare.service";
 import { notifyBookingPassengers, sendPush } from "../notification/notification.service";
+import { emailDriverTripClaimed, emailPassengerDriverAssigned } from "../email/email.service";
 
 export interface PostRideInput {
   initiatorId: string;
@@ -190,15 +191,17 @@ export async function claimTrip(rideId: string, driverId: string) {
     [rideId]
   );
 
-  await Promise.all(
-    passengers.map((p) =>
+  await Promise.all([
+    ...passengers.map((p) =>
       sendPush(p.passenger_id, {
         title: "Your driver is confirmed!",
         body: `${driver.name} (★ ${Number(driver.rating).toFixed(1)}) will be your driver. Get ready!`,
         data: { type: "driver_assigned", rideId, driverId, driverName: driver.name },
       })
-    )
-  );
+    ),
+    emailDriverTripClaimed(driverId, rideId),
+    ...passengers.map((p) => emailPassengerDriverAssigned(p.passenger_id, driverId, rideId)),
+  ]);
 
   return getRide(rideId);
 }

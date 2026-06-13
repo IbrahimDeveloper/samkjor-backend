@@ -9,6 +9,7 @@ const router = Router();
 const RegisterSchema = z.object({
   name: z.string().min(2),
   phone: z.string().min(8),
+  email: z.string().email().optional(),
   password: z.string().min(6),
   role: z.enum(["driver", "passenger", "both"]),
 });
@@ -27,9 +28,9 @@ router.post("/register", async (req: Request, res: Response, next: NextFunction)
 
     const hash = await bcrypt.hash(body.password, 10);
     const rows = await query<{ user_id: string; role: string }>(
-      `INSERT INTO users (name, phone, role, password_hash)
-       VALUES ($1, $2, $3, $4) RETURNING user_id, role`,
-      [body.name, body.phone, body.role, hash]
+      `INSERT INTO users (name, phone, email, role, password_hash)
+       VALUES ($1, $2, $3, $4, $5) RETURNING user_id, role`,
+      [body.name, body.phone, body.email ?? null, body.role, hash]
     );
     const user = rows[0];
     const token = signToken({ user_id: user.user_id, role: user.role as "driver" | "passenger" | "both" });

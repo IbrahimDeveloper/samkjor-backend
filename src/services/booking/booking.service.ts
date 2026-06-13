@@ -6,6 +6,7 @@ import {
   notifyRideInitiator,
   sendPush,
 } from "../notification/notification.service";
+import { emailNewPassengerJoined, emailBookingAccepted } from "../email/email.service";
 
 export interface BookSeatInput {
   rideId: string;
@@ -158,11 +159,15 @@ export async function acceptBooking(bookingId: string, driverId: string) {
 
   await updateAllBookingFares(booking.ride_id);
 
-  await sendPush(booking.passenger_id, {
-    title: "Booking accepted!",
-    body: "The driver has accepted your request. Get ready for pickup.",
-    data: { type: "booking_accepted", bookingId },
-  });
+  await Promise.all([
+    sendPush(booking.passenger_id, {
+      title: "Booking accepted!",
+      body: "The driver has accepted your request. Get ready for pickup.",
+      data: { type: "booking_accepted", bookingId },
+    }),
+    emailBookingAccepted(bookingId),
+    emailNewPassengerJoined(booking.ride_id, booking.passenger_id),
+  ]);
 
   return getBooking(bookingId);
 }
