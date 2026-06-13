@@ -1,0 +1,43 @@
+{
+  "name": "samkjor-backend",
+  "version": "1.0.0",
+  "description": "SamKjør shared taxi ride platform — backend",
+  "main": "dist/server.js",
+  "scripts": {
+    "dev": "ts-node-dev --respawn --transpile-only src/server.ts",
+    "build": "tsc",
+    "start": "node dist/server.js",
+    "migrate": "ts-node src/db/migrate.ts",
+    "migrate:prod": "node dist/db/migrate.js",
+    "start:prod": "npm run migrate:prod && npm start",
+    "lint": "eslint src --ext .ts"
+  },
+  "dependencies": {
+    "express": "^4.19.2",
+    "socket.io": "^4.7.5",
+    "pg": "^8.11.5",
+    "ioredis": "^5.3.2",
+    "jsonwebtoken": "^9.0.2",
+    "bcryptjs": "^2.4.3",
+    "zod": "^3.23.8",
+    "cors": "^2.8.5",
+    "helmet": "^7.1.0",
+    "morgan": "^1.10.0",
+    "dotenv": "^16.4.5",
+    "uuid": "^10.0.0",
+    "axios": "^1.7.2"
+  },
+  "devDependencies": {
+    "@types/express": "^4.17.21",
+    "@types/pg": "^8.11.6",
+    "@types/jsonwebtoken": "^9.0.6",
+    "@types/bcryptjs": "^2.4.6",
+    "@types/cors": "^2.8.17",
+    "@types/morgan": "^1.9.9",
+    "@types/uuid": "^10.0.0",
+    "@types/node": "^20.14.0",
+    "typescript": "^5.4.5",
+    "ts-node-dev": "^2.0.0",
+    "ts-node": "^10.9.2"
+  }
+}
