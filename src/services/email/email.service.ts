@@ -1,11 +1,11 @@
 import { Resend } from "resend";
 import { query, queryOne } from "../../db";
 
-const resend = new Resend(process.env.RESEND_API_KEY);
+const resend = process.env.RESEND_API_KEY ? new Resend(process.env.RESEND_API_KEY) : null;
 const FROM = process.env.EMAIL_FROM ?? "SamKjør <onboarding@resend.dev>";
 
 async function send(to: string, subject: string, html: string) {
-  if (!process.env.RESEND_API_KEY) return; // skip in dev if no key
+  if (!resend) return;
   try {
     await resend.emails.send({ from: FROM, to, subject, html });
   } catch (err) {
