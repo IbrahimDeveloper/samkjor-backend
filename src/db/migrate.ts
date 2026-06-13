@@ -3,9 +3,16 @@ import fs from "fs";
 import path from "path";
 
 async function migrate() {
+  // Look for migrations next to the source file, not in dist/
+  const migrationsDir = path.resolve(__dirname, "..", "..", "src", "db", "migrations");
+  // Fallback to relative path when running from src directly (local dev)
+  const dir = fs.existsSync(migrationsDir)
+    ? migrationsDir
+    : path.join(__dirname, "migrations");
+
   const files = ["001_init.sql", "002_claim_and_address.sql"];
   const sql = files
-    .map((f) => fs.readFileSync(path.join(__dirname, "migrations", f), "utf8"))
+    .map((f) => fs.readFileSync(path.join(dir, f), "utf8"))
     .join("\n");
   const client = await pool.connect();
   try {
