@@ -12,12 +12,15 @@ export interface PostRideInput {
   destinationAddress: string;
   destinationLat: number;
   destinationLng: number;
-  routePolyline: GeoJSON.LineString;   // from Google Directions
+  routePolyline: GeoJSON.LineString;
   totalSeats: number;
-  scheduledAt?: Date;                   // required for future trips
+  scheduledAt?: Date;
   joinDeadline?: Date;
   distanceMetres: number;
   city?: string;
+  pickupAddress?: string;
+  pickupLat?: number;
+  pickupLng?: number;
 }
 
 export interface GeoJSON {
@@ -38,7 +41,8 @@ export async function postRide(input: PostRideInput) {
        ride_type, initiator_id,
        origin_coords, destination_address, destination_coords,
        route_polyline, base_fare, total_seats, seats_remaining,
-       scheduled_at, join_deadline, status
+       scheduled_at, join_deadline, status,
+       pickup_address, pickup_coords
      ) VALUES (
        $1, $2,
        ST_SetSRID(ST_MakePoint($3, $4), 4326),
@@ -46,7 +50,11 @@ export async function postRide(input: PostRideInput) {
        ST_SetSRID(ST_MakePoint($6, $7), 4326),
        ST_GeomFromGeoJSON($8),
        $9, $10, $10,
-       $11, $12, $13
+       $11, $12, $13,
+       $14,
+       CASE WHEN $15::float IS NOT NULL AND $16::float IS NOT NULL
+            THEN ST_SetSRID(ST_MakePoint($16, $15), 4326)
+            ELSE NULL END
      ) RETURNING ride_id`,
     [
       input.rideType,
@@ -60,6 +68,9 @@ export async function postRide(input: PostRideInput) {
       scheduledAt.toISOString(),
       input.joinDeadline?.toISOString() ?? null,
       status,
+      input.pickupAddress ?? null,
+      input.pickupLat ?? null,
+      input.pickupLng ?? null,
     ]
   );
 
@@ -79,12 +90,54 @@ export async function getRide(rideId: string) {
             ST_X(r.origin_coords::geometry) AS origin_lng,
             ST_Y(r.destination_coords::geometry) AS dest_lat,
             ST_X(r.destination_coords::geometry) AS dest_lng,
+            CASE WHEN r.pickup_coords IS NOT NULL
+                 THEN ST_Y(r.pickup_coords::geometry) END AS pickup_lat,
+            CASE WHEN r.pickup_coords IS NOT NULL
+                 THEN ST_X(r.pickup_coords::geometry) END AS pickup_lng,
             u.name AS initiator_name, u.rating AS initiator_rating
      FROM rides r
      JOIN users u ON u.user_id = r.initiator_id
      WHERE r.ride_id = $1`,
     [rideId]
   );
+}
+
+export async function startTrip(rideId: string, initiatorId: string) {
+  const ride = await queryOne<{ status: string; initiator_id: string; base_fare: number }>(
+    "SELECT status, initiator_id, base_fare FROM rides WHERE ride_id = $1",
+    [rideId]
+  );
+  if (!ride) throw new Error("Ride not found");
+  if (ride.initiator_id !== initiatorId) throw new Error("Only the organizer can start the trip");
+  if (ride.status !== "scheduled") throw new Error("Trip is not in scheduled state");
+
+  // Mark payments as held for all confirmed passengers
+  await query(
+    `UPDATE bookings SET payment_held = TRUE
+     WHERE ride_id = $1 AND status = 'confirmed'`,
+    [rideId]
+  );
+
+  await query(
+    "UPDATE rides SET status = 'live' WHERE ride_id = $1",
+    [rideId]
+  );
+
+  // Notify all confirmed passengers
+  const passengers = await query<{ passenger_id: string }>(
+    "SELECT passenger_id FROM bookings WHERE ride_id = $1 AND status = 'confirmed'",
+    [rideId]
+  );
+
+  await Promise.all(passengers.map((p) =>
+    sendPush(p.passenger_id, {
+      title: "Your trip has started!",
+      body: "The driver is on the way to your pickup point.",
+      data: { type: "trip_started", rideId },
+    })
+  ));
+
+  return getRide(rideId);
 }
 
 export async function listRidesNearby(lat: number, lng: number, radiusMetres = 5000) {

@@ -52,16 +52,16 @@ router.post("/:id/cancel", requireAuth, async (req: Request, res: Response, next
   } catch (err) { next(err); }
 });
 
-// POST /bookings/:id/accept  — driver accepts a pending booking
-router.post("/:id/accept", requireAuth, requireDriver, async (req: Request, res: Response, next: NextFunction) => {
+// POST /bookings/:id/accept  — driver or trip organizer accepts a pending booking
+router.post("/:id/accept", requireAuth, async (req: Request, res: Response, next: NextFunction) => {
   try {
     const result = await acceptBooking(req.params.id, req.user!.user_id);
     res.json(result);
   } catch (err) { next(err); }
 });
 
-// POST /bookings/:id/decline  — driver declines a pending booking
-router.post("/:id/decline", requireAuth, requireDriver, async (req: Request, res: Response, next: NextFunction) => {
+// POST /bookings/:id/decline  — driver or trip organizer declines a pending booking
+router.post("/:id/decline", requireAuth, async (req: Request, res: Response, next: NextFunction) => {
   try {
     const result = await declineBooking(req.params.id, req.user!.user_id);
     res.json(result);

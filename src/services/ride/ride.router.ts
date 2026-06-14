@@ -10,6 +10,7 @@ import {
   endRide,
   updateDriverLocation,
   claimTrip,
+  startTrip,
 } from "./ride.service";
 
 const router = Router();
@@ -30,6 +31,9 @@ const PostRideSchema = z.object({
   join_deadline: z.string().datetime().optional(),
   distance_metres: z.number().positive(),
   city: z.string().optional(),
+  pickup_address: z.string().optional(),
+  pickup_lat: z.number().optional(),
+  pickup_lng: z.number().optional(),
 });
 
 // POST /rides — driver or passenger organiser posts a ride/trip
@@ -56,6 +60,9 @@ router.post("/", requireAuth, async (req: Request, res: Response, next: NextFunc
       joinDeadline: body.join_deadline ? new Date(body.join_deadline) : undefined,
       distanceMetres: body.distance_metres,
       city: body.city,
+      pickupAddress: body.pickup_address,
+      pickupLat: body.pickup_lat,
+      pickupLng: body.pickup_lng,
     });
 
     res.status(201).json(ride);
@@ -122,6 +129,47 @@ router.post(
     } catch (err) { next(err); }
   }
 );
+
+// GET /rides/my-trip — passenger's active organized trip (as organizer or member)
+router.get("/my-trip", requireAuth, async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const ride = await queryOne<Record<string, unknown>>(
+      `SELECT r.*,
+              ST_AsGeoJSON(r.route_polyline)::json AS route_polyline_geo,
+              ST_Y(r.origin_coords::geometry) AS origin_lat,
+              ST_X(r.origin_coords::geometry) AS origin_lng,
+              ST_Y(r.destination_coords::geometry) AS dest_lat,
+              ST_X(r.destination_coords::geometry) AS dest_lng,
+              CASE WHEN r.pickup_coords IS NOT NULL THEN ST_Y(r.pickup_coords::geometry) END AS pickup_lat,
+              CASE WHEN r.pickup_coords IS NOT NULL THEN ST_X(r.pickup_coords::geometry) END AS pickup_lng,
+              u.name AS initiator_name
+       FROM rides r
+       JOIN users u ON u.user_id = r.initiator_id
+       WHERE r.ride_type = 'future'
+         AND r.status IN ('scheduled','live')
+         AND (
+           r.initiator_id = $1
+           OR EXISTS (
+             SELECT 1 FROM bookings b
+             WHERE b.ride_id = r.ride_id
+               AND b.passenger_id = $1
+               AND b.status IN ('pending','confirmed')
+           )
+         )
+       ORDER BY r.created_at DESC LIMIT 1`,
+      [req.user!.user_id]
+    );
+    res.json(ride ?? null);
+  } catch (err) { next(err); }
+});
+
+// POST /rides/:id/start  — organizer starts the trip
+router.post("/:id/start", requireAuth, async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const ride = await startTrip(req.params.id, req.user!.user_id);
+    res.json(ride);
+  } catch (err) { next(err); }
+});
 
 // POST /rides/:id/claim  — driver takes a future passenger trip
 router.post("/:id/claim", requireAuth, requireDriver, async (req: Request, res: Response, next: NextFunction) => {
