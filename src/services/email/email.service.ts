@@ -4,12 +4,16 @@ import { query, queryOne } from "../../db";
 const resend = process.env.RESEND_API_KEY ? new Resend(process.env.RESEND_API_KEY) : null;
 const FROM = process.env.EMAIL_FROM ?? "SamKjør <onboarding@resend.dev>";
 
+if (!resend) console.warn("[email] RESEND_API_KEY not set — emails disabled");
+
 async function send(to: string, subject: string, html: string) {
-  if (!resend) return;
+  if (!resend) { console.warn("[email] skipping send — no API key"); return; }
+  console.log(`[email] sending to ${to}: ${subject}`);
   try {
-    await resend.emails.send({ from: FROM, to, subject, html });
+    const result = await resend.emails.send({ from: FROM, to, subject, html });
+    console.log("[email] sent ok", result);
   } catch (err) {
-    console.error("Email send failed:", err);
+    console.error("[email] send failed:", err);
   }
 }
 
