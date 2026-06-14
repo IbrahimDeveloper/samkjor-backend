@@ -144,6 +144,10 @@ export async function listRidesNearby(lat: number, lng: number, radiusMetres = 5
   return query<Record<string, unknown>>(
     `SELECT r.ride_id, r.ride_type, r.status, r.seats_remaining,
             r.base_fare, r.scheduled_at, r.destination_address,
+            r.total_seats, r.assigned_driver_id,
+            r.pickup_address,
+            CASE WHEN r.pickup_coords IS NOT NULL THEN ST_Y(r.pickup_coords::geometry) END AS pickup_lat,
+            CASE WHEN r.pickup_coords IS NOT NULL THEN ST_X(r.pickup_coords::geometry) END AS pickup_lng,
             ST_AsGeoJSON(r.route_polyline)::json AS route_polyline_geo,
             u.name AS initiator_name, u.rating AS initiator_rating
      FROM rides r
@@ -223,7 +227,7 @@ export async function claimTrip(rideId: string, driverId: string) {
   );
   if (!ride) throw new Error("Ride not found");
   if (ride.ride_type !== "future") throw new Error("Only future trips can be claimed");
-  if (ride.status !== "scheduled") throw new Error("Trip is not available to claim");
+  if (!["scheduled", "live"].includes(ride.status)) throw new Error("Trip is not available to claim");
   if (ride.assigned_driver_id) throw new Error("Trip already has a driver");
 
   const driver = await queryOne<{ name: string; phone: string; rating: number }>(
