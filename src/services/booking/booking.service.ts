@@ -49,6 +49,8 @@ export async function bookSeat(input: BookSeatInput) {
     data: { type: "booking_request", rideId: input.rideId, bookingId },
   });
 
+  emailNewPassengerJoined(input.rideId, input.passengerId).catch(() => {});
+
   return getBooking(bookingId);
 }
 
